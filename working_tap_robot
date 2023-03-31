@@ -113,7 +113,7 @@ void jump(int X) {
 void tap(int repeat, int OnTime) {
 for (count = 0; count < repeat;){
     unsigned long currentMillis = millis();
-    tapdelay = map(potValue, 0, 1024, 800, 55);
+    tapdelay = map(potValue, 0, 1024, 800, 55);  //use tap delay if you want the pot to control the tap rate, otherwise next line should just have a ms delay instead of "taprate"
 
  if (!solenoidOn && currentMillis - lastSolenoidTime >= tapdelay) { // check if the interval has elapsed and the solenoid is not already on
     digitalWrite(solenoidPin, HIGH); // trigger the solenoid
