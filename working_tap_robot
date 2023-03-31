@@ -1,0 +1,131 @@
+int potPin = A0;
+int repeat = 1;
+int potValue;
+int count = 0;
+const int stepPin = D5;
+const int dirPin = D6;
+const int solenoidPin = D3; // Pin connected to the solenoid
+int j=1;
+const int stepsPerRevolution = 200;
+
+#include <Stepper.h>
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+int tapdelay = 500;
+Stepper myStepper(stepsPerRevolution, dirPin, stepPin);
+unsigned long lastSolenoidTime = 0; // variable to store the last time solenoid was triggered
+unsigned long solenoidOnTime = 30; // solenoid on time in ms
+bool solenoidOn = false; // flag to keep track of the solenoid state
+
+void setup() {
+  pinMode(solenoidPin, OUTPUT);
+  myStepper.setSpeed(75);
+  pinMode(stepPin, OUTPUT);
+  pinMode(dirPin, OUTPUT);
+  Serial.begin(9600);
+   delay(5000);
+}
+
+void loop() {
+
+
+  potValue = analogRead(potPin);
+
+  Serial.print("pot value is ");
+  Serial.print(potValue);
+  Serial.print(" and tapdelay value is ");
+  Serial.println(tapdelay);
+
+  
+
+  unsigned long currentMillis = millis();
+ 
+  
+ tap(5, solenoidOnTime);
+right(1000);
+left(3300);
+right(750);
+left(2222);
+right(850);
+
+  
+}
+
+
+
+
+
+void tripletap() {
+  for(int i = 0; i < 3; i++){
+  digitalWrite(solenoidPin, HIGH);
+  delay(40);
+  digitalWrite(solenoidPin, LOW);
+  delay(40); 
+  }
+} 
+
+ void left(int X) {
+  static unsigned long lastTime = 0;
+  static int Lstate = 0;
+  const int interval = X;
+
+  if (millis() - lastTime >= interval) {
+    lastTime = millis();
+    if (Lstate == 0) {
+      myStepper.step(-65);
+      Lstate = 1;
+      Serial.print("going left ");
+        Serial.println(X);
+    } else {
+      myStepper.step(65);
+      Lstate = 0;
+    }
+  }
+}
+
+void right(int X) {
+  static unsigned long lastTime = 0;
+  static int Rstate = 0;
+  const int interval = X;
+
+  if (millis() - lastTime >= interval) {
+    lastTime = millis();
+    if (Rstate == 0) {
+      myStepper.step(65);
+      Rstate = 1;
+        Serial.print("going right ");
+        Serial.println(X);
+    } else {
+      myStepper.step(-65);
+      Rstate = 0;
+    }
+  }
+}
+
+void jump(int X) {
+  Serial.print("jumping");
+  digitalWrite(solenoidPin, HIGH);
+  delay(X);
+  digitalWrite(solenoidPin, LOW); 
+}
+
+void tap(int repeat, int OnTime) {
+for (count = 0; count < repeat;){
+    unsigned long currentMillis = millis();
+    tapdelay = map(potValue, 0, 1024, 800, 55);
+
+ if (!solenoidOn && currentMillis - lastSolenoidTime >= tapdelay) { // check if the interval has elapsed and the solenoid is not already on
+    digitalWrite(solenoidPin, HIGH); // trigger the solenoid
+    solenoidOn = true; // set the solenoid state to on
+    lastSolenoidTime = currentMillis; // update the last solenoid time
+    count++;
+    Serial.print(" count ");
+    Serial.println(count);
+  } else if (solenoidOn && currentMillis - lastSolenoidTime >= OnTime) { // check if it's time to release the solenoid and the solenoid is already on
+    digitalWrite(solenoidPin, LOW); // release the solenoid
+    solenoidOn = false; // set the solenoid state to off
+  } 
+ }
+}
+  
