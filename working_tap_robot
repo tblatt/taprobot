@@ -4,8 +4,12 @@ int potValue;
 int count = 0;
 const int stepPin = D5;
 const int dirPin = D6;
+const int buttonPin = D4;
+const int switchPin1 = D2;
+const int switchPin2 = D1;
+
 const int solenoidPin = D3; // Pin connected to the solenoid
-int j=1;
+int j = 1;
 const int stepsPerRevolution = 200;
 
 #include <Stepper.h>
@@ -17,55 +21,98 @@ Stepper myStepper(stepsPerRevolution, dirPin, stepPin);
 unsigned long lastSolenoidTime = 0; // variable to store the last time solenoid was triggered
 unsigned long solenoidOnTime = 30; // solenoid on time in ms
 bool solenoidOn = false; // flag to keep track of the solenoid state
+bool switchState1;
+bool switchState2;
+bool buttonState;
 
 void setup() {
   pinMode(solenoidPin, OUTPUT);
   myStepper.setSpeed(75);
   pinMode(stepPin, OUTPUT);
   pinMode(dirPin, OUTPUT);
+  pinMode(buttonPin, INPUT);
+  pinMode(switchPin1, INPUT);
+  pinMode(switchPin2, INPUT);
+
   Serial.begin(9600);
-   delay(5000);
+  delay(2000);
 }
 
 void loop() {
-
-
-  potValue = analogRead(potPin);
-
-  Serial.print("pot value is ");
-  Serial.print(potValue);
-  Serial.print(" and tapdelay value is ");
-  Serial.println(tapdelay);
-
-  
-
   unsigned long currentMillis = millis();
- 
-  
- tap(5, solenoidOnTime);
-right(1000);
-left(3300);
-right(750);
-left(2222);
-right(850);
 
-  
+  // Handle solenoid tapping
+  potValue = analogRead(potPin);
+  tapdelay = map(potValue, 0, 1024, 800, 55); // Map potentiometer value to tapping delay range
+  handleSolenoid(currentMillis);
+
+  // Handle stepper motor movement
+  handleStepper(currentMillis);
 }
 
+void handleSolenoid(unsigned long currentMillis) {
+  static unsigned long lastSolenoidTime = 0;
+  static bool solenoidOn = false;
 
+  if (currentMillis - lastSolenoidTime >= (solenoidOn ? solenoidOnTime : tapdelay)) {
+    lastSolenoidTime = currentMillis;
 
-
-
-void tripletap() {
-  for(int i = 0; i < 3; i++){
-  digitalWrite(solenoidPin, HIGH);
-  delay(40);
-  digitalWrite(solenoidPin, LOW);
-  delay(40); 
+    if (solenoidOn) {
+      digitalWrite(solenoidPin, LOW); // Turn solenoid off
+      solenoidOn = false;
+    } else {
+      digitalWrite(solenoidPin, HIGH); // Turn solenoid on
+      solenoidOn = true;
+    }
   }
-} 
+}
 
- void left(int X) {
+void handleStepper(unsigned long currentMillis) {
+  static unsigned long stepperMillis = 0;
+  static int stepperState = 0; // 0 = neutral, 1 = left, 2 = right
+  static int stepDirection = 0; // -1 for left, 0 for neutral, 1 for right
+  static unsigned long lastStepTime = 0;
+  const unsigned long stepInterval = 2; // Adjust this for smoother stepping speed
+
+  // Change state every 1 second
+  if (currentMillis - stepperMillis >= 1000) {
+    stepperMillis = currentMillis;
+    stepperState = (stepperState + 1) % 3; // Cycle through 0 = neutral, 1 = left, 2 = right
+
+    switch (stepperState) {
+      case 0: // Neutral
+        Serial.println("Neutral");
+        stepDirection = 0;
+        break;
+
+      case 1: // Move left
+        Serial.println("Moving left");
+        stepDirection = -1;
+        break;
+
+      case 2: // Move right
+        Serial.println("Moving right");
+        stepDirection = 1;
+        break;
+    }
+  }
+
+  // Continuous smooth stepping
+  if (stepDirection != 0 && currentMillis - lastStepTime >= stepInterval) {
+    lastStepTime = currentMillis;
+    myStepper.step(stepDirection); // Move one step in the current direction
+  }
+}
+void tripletap() {
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(solenoidPin, HIGH);
+    delay(40);
+    digitalWrite(solenoidPin, LOW);
+    delay(40);
+  }
+}
+
+void left(int X) {
   static unsigned long lastTime = 0;
   static int Lstate = 0;
   const int interval = X;
@@ -76,7 +123,7 @@ void tripletap() {
       myStepper.step(-65);
       Lstate = 1;
       Serial.print("going left ");
-        Serial.println(X);
+      Serial.println(X);
     } else {
       myStepper.step(65);
       Lstate = 0;
@@ -94,8 +141,8 @@ void right(int X) {
     if (Rstate == 0) {
       myStepper.step(65);
       Rstate = 1;
-        Serial.print("going right ");
-        Serial.println(X);
+      Serial.print("going right ");
+      Serial.println(millis());
     } else {
       myStepper.step(-65);
       Rstate = 0;
@@ -107,25 +154,32 @@ void jump(int X) {
   Serial.print("jumping");
   digitalWrite(solenoidPin, HIGH);
   delay(X);
-  digitalWrite(solenoidPin, LOW); 
+  digitalWrite(solenoidPin, LOW);
 }
 
 void tap(int repeat, int OnTime) {
-for (count = 0; count < repeat;){
-    unsigned long currentMillis = millis();
-    tapdelay = map(potValue, 0, 1024, 800, 55);  //use tap delay if you want the pot to control the tap rate, otherwise next line should just have a ms delay instead of "taprate"
 
- if (!solenoidOn && currentMillis - lastSolenoidTime >= tapdelay) { // check if the interval has elapsed and the solenoid is not already on
-    digitalWrite(solenoidPin, HIGH); // trigger the solenoid
-    solenoidOn = true; // set the solenoid state to on
-    lastSolenoidTime = currentMillis; // update the last solenoid time
-    count++;
-    Serial.print(" count ");
-    Serial.println(count);
-  } else if (solenoidOn && currentMillis - lastSolenoidTime >= OnTime) { // check if it's time to release the solenoid and the solenoid is already on
+  if (potValue > 7) {
+    for (count = 0; count < repeat;) {
+
+      unsigned long currentMillis = millis();
+      tapdelay = map(potValue, 0, 1024, 800, 55);
+
+      if (!solenoidOn && currentMillis - lastSolenoidTime >= tapdelay) { // check if the interval has elapsed and the solenoid is not already on
+        digitalWrite(solenoidPin, HIGH); // trigger the solenoid
+        solenoidOn = true; // set the solenoid state to on
+        lastSolenoidTime = currentMillis; // update the last solenoid time
+        count++;
+        // Serial.print(" count ");
+        // Serial.println(count);
+      } else if (solenoidOn && currentMillis - lastSolenoidTime >= OnTime) { // check if it's time to release the solenoid and the solenoid is already on
+        digitalWrite(solenoidPin, LOW); // release the solenoid
+        solenoidOn = false; // set the solenoid state to off
+      }
+    }
+  }
+  else {
     digitalWrite(solenoidPin, LOW); // release the solenoid
     solenoidOn = false; // set the solenoid state to off
-  } 
- }
+  }
 }
-  
