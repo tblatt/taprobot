@@ -1,12 +1,12 @@
 int potPin = A0;
 int repeat = 1;
-int potValue;
+int potValue = 0;
 int count = 0;
 const int stepPin = D5;
 const int dirPin = D6;
 const int buttonPin = D4;
-const int switchPin1 = D2;
-const int switchPin2 = D1;
+//const int switchPin1 = D2;
+//const int switchPin2 = D1;
 
 const int solenoidPin = D3; // Pin connected to the solenoid
 int j = 1;
@@ -16,6 +16,12 @@ const int stepsPerRevolution = 200;
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Define LCD I2C address and pins
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Address 0x27 for 16x2 LCD
+
 int tapdelay = 500;
 Stepper myStepper(stepsPerRevolution, dirPin, stepPin);
 unsigned long lastSolenoidTime = 0; // variable to store the last time solenoid was triggered
@@ -31,11 +37,16 @@ void setup() {
   pinMode(stepPin, OUTPUT);
   pinMode(dirPin, OUTPUT);
   pinMode(buttonPin, INPUT);
-  pinMode(switchPin1, INPUT);
-  pinMode(switchPin2, INPUT);
-
+//  pinMode(switchPin1, INPUT);
+//  pinMode(switchPin2, INPUT);
+Wire.begin(D1, D2);  // Use D1 for SDA and D2 for SCL
+  
+ lcd.begin(16,2);  // Initialize the LCD
+ lcd.backlight();  // Turn on the backlight
   Serial.begin(9600);
   delay(2000);
+  lcd.setCursor(0, 0);  
+  lcd.print("TapGPT");
 }
 
 void loop() {
@@ -43,6 +54,17 @@ void loop() {
 
   // Handle solenoid tapping
   potValue = analogRead(potPin);
+  // Map the potentiometer value to a range (optional, for better display)
+  int displayValue = map(potValue, 0, 1023, 1, 18);
+  // Clear previous display on the second row
+  lcd.setCursor(0, 1);
+  lcd.print("TPS:");
+  // Display the potentiometer value on the second row
+  lcd.setCursor(5, 1);
+  lcd.print("    ");
+  lcd.setCursor(5, 1);
+  lcd.print(displayValue);
+  
   tapdelay = map(potValue, 0, 1024, 800, 55); // Map potentiometer value to tapping delay range
   handleSolenoid(currentMillis);
 
@@ -75,7 +97,7 @@ void handleStepper(unsigned long currentMillis) {
   const unsigned long stepInterval = 2; // Adjust this for smoother stepping speed
 
   // Change state every 1 second
-  if (currentMillis - stepperMillis >= 1000) {
+  if (currentMillis - stepperMillis >= 500) {
     stepperMillis = currentMillis;
     stepperState = (stepperState + 1) % 3; // Cycle through 0 = neutral, 1 = left, 2 = right
 
